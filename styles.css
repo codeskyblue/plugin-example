@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: theme(colors.white);
+    --foreground: theme(colors.slate.900);
+    --primary: theme(colors.slate.900);
+    --primary-hover: theme(colors.slate.800);
+    --primary-foreground: theme(colors.white);
+  }
+
+  .dark {
+    --background: theme(colors.slate.900);
+    --foreground: theme(colors.slate.100);
+    --primary: theme(colors.slate.100);
+    --primary-hover: theme(colors.slate.200);
+    --primary-foreground: theme(colors.slate.900);
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
