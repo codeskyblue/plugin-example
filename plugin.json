@@ -1,8 +1,10 @@
 {
   "$schema": "http://localhost:33299/plugin.schema.json",
-  "name": "preact-template",
+  "name": "插件示例",
   "version": "1.0.0",
-  "description": "A uiautodev plugin template with Preact and Tailwind CSS",
-  "homepage": "",
+  "description": "一个示例插件，展示如何调用平台提供的各种接口",
+  "homepage": "https://github.com/codeskyblue/plugin-example",
+  "allowed_hosts": ["httpbin.org"],
+  "display": "tab",
   "main": "index.html"
 }

@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # Build output
 plugin-runtime.d.ts
+app.js
+app.css
+.playwright-cli/
