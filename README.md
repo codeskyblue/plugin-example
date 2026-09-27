@@ -1,76 +1,76 @@
-# uiautodev Preact Plugin Template
+# plugin-example
 
-基于 Preact + TypeScript + Tailwind CSS 的 [uiauto.dev](https://github.com/nicepkg/uiautodev) 插件开发模板。内置 AI 开发引导，用 Claude Code 打开项目即可开始。
+uiauto.dev 插件接口示例。基于 Preact + TypeScript + Tailwind CSS，用一个多标签页面演示平台提供给插件的全部 API（`$u`）。
+
+## 功能演示
+
+页面顶部按接口分区，每个标签对应一类能力：
+
+| 标签   | 演示的 API                                                                 |
+| ------ | -------------------------------------------------------------------------- |
+| 信息   | `$u.deviceId`、`$u.plugin`                                                 |
+| Shell  | `$u.shell({ command, timeoutMs })`                                         |
+| 按键   | `$u.pressKey(key, metaState?)`                                             |
+| 输入   | `$u.inputText(text)`                                                       |
+| 点击   | `$u.tap(x, y, screenWidth, screenHeight)`                                  |
+| 画面   | `$u.screenshotAsBase64()`、`$u.setScreenImage(Blob \| null)`               |
+| 交互   | `$u.onScreenTap`、`$u.setMode`、`$u.onModeChange`                          |
+| Fetch  | `$u.fetch(url, init?)`（需在 `plugin.json` 配置 `allowed_hosts`）          |
+| AI     | `$u.openai({ messages, stream })`，支持流式与一次性返回                    |
 
 ## 快速开始
 
-### 1. 克隆模板
-
 ```bash
-git clone https://github.com/uiautodev-plugins/preact-template ~/.config/uiautodev/plugins/my-plugin
-cd !$
+npm install          # 安装依赖
+npm run fetch-types  # 从 uiauto.dev 运行时拉取 plugin-runtime.d.ts
+npm run dev          # 开发模式，监听 app.tsx 与 styles.css 自动编译
 ```
-
-### 2. 安装依赖
-
-```bash
-npm install
-```
-
-### 3. 用 AI 开发插件
-
-本项目内置了 `CLAUDE.md`，Claude Code 会自动读取其中的开发指引。
-
-```bash
-# 在项目目录下启动 Claude Code
-claude
-```
-
-进入后对 AI 说 **"初始化项目"**，AI 会引导你：
-
-1. 描述你想做的插件功能
-2. 推荐插件名称
-3. 自动配置 `plugin.json`
-4. 拉取最新的类型定义
-5. 确认方案后直接开始开发
-
-你也可以直接告诉 AI 你想做什么，比如：
-
-> "帮我做一个插件，点击按钮后截屏并保存到相册"
-
-AI 会读取 `plugin-runtime.d.ts` 中的平台 API 类型，自动完成开发。
 
 ## 项目结构
 
 ```
-├── plugin.json          # 插件元信息（名称、版本、描述）
+├── plugin.json          # 插件元信息（名称、版本、描述、allowed_hosts）
 ├── app.tsx              # 插件逻辑入口（开发这个文件）
 ├── index.html           # 插件 UI 入口
 ├── styles.css           # Tailwind 样式源文件
 ├── tailwind.config.js   # Tailwind 配置（含 darkMode: 'class'）
-├── app.js               # 编译产物（由 app.tsx 打包）
-├── app.css              # 编译产物（由 styles.css 生成）
-├── plugin-runtime.d.ts  # 平台 API 类型定义
-└── CLAUDE.md            # AI 开发指引（Claude Code 自动读取）
+├── app.js               # 编译产物（由 app.tsx 打包，已 gitignore）
+├── app.css              # 编译产物（由 styles.css 生成，已 gitignore）
+├── plugin-runtime.d.ts  # 平台 API 类型定义（fetch-types 拉取，已 gitignore）
+└── CLAUDE.md            # AI 开发指引
 ```
 
 ## 可用 API
 
-通过全局变量 `$u` 访问平台 API（详见 `plugin-runtime.d.ts`）：
+通过全局变量 `$u` 访问平台 API（完整签名见 `plugin-runtime.d.ts`）：
 
 ```typescript
 // 执行 shell 命令
-const result = await $u.shell('getprop ro.product.model');
-console.log(result.output); // 设备型号
+const r = await $u.shell({ command: 'getprop ro.product.model', timeoutMs: 10000 });
+console.log(r.output);
 
-// 当前设备 ID
-console.log($u.deviceId);
+// 设备与插件信息
+console.log($u.deviceId, $u.plugin.name);
+
+// 按键 / 输入 / 点击
+await $u.pressKey('home');
+await $u.inputText('hello');
+await $u.tap(540, 1200, 1080, 2400); // x, y, screenWidth, screenHeight
 
 // 截屏（返回 data:image/png;base64,...）
 const base64 = await $u.screenshotAsBase64();
+await $u.setScreenImage(blob); // 冻结画面，传 null 恢复
 
-// 当前插件信息
-console.log($u.plugin.name);
+// 订阅屏幕点击 / 切换屏幕模式
+const offTap = $u.onScreenTap((e) => console.log(e.x, e.y, e.screenWidth, e.screenHeight));
+const offMode = $u.onModeChange((mode) => console.log(mode)); // control / readonly / recording
+await $u.setMode(ScreenModes.Recording);
+
+// 代理请求（绕过 CORS，需在 plugin.json 的 allowed_hosts 中声明域名）
+const res = await $u.fetch('https://httpbin.org/get');
+
+// 调用 OpenAI 兼容接口
+const result = await $u.openai({ messages: [{ role: 'user', content: '你好' }], stream: true });
 ```
 
 ## 开发命令
@@ -91,7 +91,7 @@ npm run fetch-types  # 拉取最新类型定义（需 uiauto.dev 运行中）
 pre-commit install
 ```
 
-之后每次 `git commit` 都会自动格式化改动文件（构建产物 `app.js`、`app.css` 已在 `.prettierignore` 中排除）。
+之后每次 `git commit` 都会自动格式化改动文件。
 
 ## 技术栈
 
