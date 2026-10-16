@@ -10,13 +10,39 @@ import {
   Camera,
   Image as ImageIcon,
   ImageOff,
-  Radio,
+  CircleDot,
   Globe,
   Bot,
   Send,
   Square,
+  Play,
   Loader2,
+  Scale,
 } from 'lucide-preact';
+
+const defaultJevParams = {
+  state: '用户说：帮我把这条消息删除掉，越快越好。',
+  questions: {
+    is_safe: {
+      type: 'noul',
+      instructions: '这条请求是否安全、不涉及危险操作？',
+    },
+    urgency: {
+      type: 'choice',
+      instructions: '这条请求的紧急程度',
+      criteria: {
+        low: '可以稍后处理',
+        normal: '按常规流程处理',
+        high: '需要立即处理',
+      },
+    },
+    risk: {
+      type: 'score',
+      instructions: '这条请求的风险等级',
+      criteria: ['很低', '低', '中', '高', '很高'],
+    },
+  },
+};
 
 const ScreenModes = {
   Control: 'control',
@@ -49,16 +75,19 @@ function IconButton({
   onClick,
   children,
   title,
+  disabled,
 }: {
   active?: boolean;
   onClick?: () => void;
   children: preact.ComponentChildren;
   title?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       title={title}
-      class={`inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium cursor-pointer transition-colors ${
+      disabled={disabled}
+      class={`inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium cursor-pointer transition-colors disabled:pointer-events-none disabled:opacity-50 ${
         active
           ? 'bg-primary text-primary-foreground border-primary'
           : 'bg-transparent text-foreground border-gray-300 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800'
@@ -107,16 +136,18 @@ function Section({
   title,
   children,
 }: {
-  icon: preact.ComponentChildren;
-  title: string;
+  icon?: preact.ComponentChildren;
+  title?: string;
   children: preact.ComponentChildren;
 }) {
   return (
     <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-      <h2 class="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-        {icon}
-        {title}
-      </h2>
+      {title && (
+        <h2 class="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+          {icon}
+          {title}
+        </h2>
+      )}
       <div class="flex flex-col gap-3">{children}</div>
     </section>
   );
@@ -173,6 +204,9 @@ function App() {
   // screen tap subscription
   const [screenTaps, setScreenTaps] = useState<ScreenTapEvent[]>([]);
   const [recording, setRecording] = useState(false);
+  const [playInterval, setPlayInterval] = useState('300');
+  const [playing, setPlaying] = useState(false);
+  const playAbortRef = useRef(false);
   const [touchControl, setTouchControl] = useState(true);
   const [syncControl, setSyncControl] = useState(true);
   const syncControlRef = useRef(syncControl);
@@ -190,6 +224,11 @@ function App() {
   const [aiOut, setAiOut] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
+  // jev
+  const [jevInput, setJevInput] = useState(() => json(defaultJevParams));
+  const [jevOut, setJevOut] = useState('');
+  const [jevLoading, setJevLoading] = useState(false);
+
   useEffect(() => {
     return $u.onScreenTap((evt) => {
       setScreenTaps((prev) => [evt, ...prev].slice(0, 50));
@@ -204,6 +243,33 @@ function App() {
   }, []);
 
   const clearTaps = useCallback(() => setScreenTaps([]), []);
+
+  const startPlayback = useCallback(async () => {
+    const events = [...screenTaps].reverse();
+    if (events.length === 0 || playing) return;
+    const gap = Math.max(0, Number(playInterval) || 0);
+    playAbortRef.current = false;
+    setPlaying(true);
+    try {
+      for (let i = 0; i < events.length; i++) {
+        if (playAbortRef.current) break;
+        const e = events[i];
+        await $u.tap(e.x, e.y, e.screenWidth, e.screenHeight);
+        if (i < events.length - 1 && !playAbortRef.current) {
+          await new Promise((r) => setTimeout(r, gap));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      playAbortRef.current = false;
+      setPlaying(false);
+    }
+  }, [screenTaps, playInterval, playing]);
+
+  const stopPlayback = useCallback(() => {
+    playAbortRef.current = true;
+  }, []);
 
   const runShell = useCallback(async () => {
     setShellOut('');
@@ -317,6 +383,20 @@ function App() {
     }
   }, [prompt]);
 
+  const doJev = useCallback(async () => {
+    setJevLoading(true);
+    setJevOut('');
+    try {
+      const params = JSON.parse(jevInput) as JevDecisionParams;
+      const d = await $u.jev(params);
+      setJevOut(json(d));
+    } catch (e) {
+      setJevOut(String(e));
+    } finally {
+      setJevLoading(false);
+    }
+  }, [jevInput]);
+
   const [activeTab, setActiveTab] = useState('info');
 
   const numberInput = (value: string, setter: (v: string) => void, label: string) => (
@@ -338,9 +418,10 @@ function App() {
     { id: 'text', label: '输入', icon: <Type size={14} /> },
     { id: 'tap', label: '点击', icon: <MousePointerClick size={14} /> },
     { id: 'screen', label: '画面', icon: <Camera size={14} /> },
-    { id: 'interact', label: '交互', icon: <Radio size={14} /> },
+    { id: 'interact', label: '录制', icon: <CircleDot size={14} /> },
     { id: 'fetch', label: 'Fetch', icon: <Globe size={14} /> },
     { id: 'openai', label: 'AI', icon: <Bot size={14} /> },
+    { id: 'jev', label: 'Jev', icon: <Scale size={14} /> },
   ];
 
   return (
@@ -433,30 +514,49 @@ function App() {
               <Camera size={14} />
               截图
             </Button>
-          <Button onClick={toggleFreeze}>
-            {frozen ? <ImageOff size={14} /> : <ImageIcon size={14} />}
-            {frozen ? '恢复画面' : '冻结画面'}
-          </Button>
-          <Button onClick={() => setShot(null)}>重置</Button>
-        </div>
-          {shot && <img src={shot} class="w-full rounded-md border border-gray-200 dark:border-gray-700" />}
+            <Button onClick={toggleFreeze}>
+              {frozen ? <ImageOff size={14} /> : <ImageIcon size={14} />}
+              {frozen ? '恢复画面' : '冻结画面'}
+            </Button>
+            <Button onClick={() => setShot(null)}>重置</Button>
+          </div>
+          {shot && (
+            <img src={shot} class="w-full rounded-md border border-gray-200 dark:border-gray-700" />
+          )}
         </Section>
       )}
 
       {activeTab === 'interact' && (
-        <Section icon={<Radio size={16} />} title="交互订阅">
+        <Section>
           <div class="flex flex-wrap items-center gap-2">
             <IconButton active={recording} onClick={toggleRecording}>
-              {recording ? <Square size={14} /> : <Radio size={14} />}
+              {recording ? <Square size={14} /> : <CircleDot size={14} />}
               {recording ? '关闭录制' : '开启录制'}
             </IconButton>
             <Switch checked={touchControl} onChange={toggleTouch} label="触摸控制" />
             <Switch checked={syncControl} onChange={setSyncControl} label="同步控制" />
+            {playing ? (
+              <IconButton active onClick={stopPlayback}>
+                <Square size={14} />
+                停止回放
+              </IconButton>
+            ) : (
+              <IconButton onClick={startPlayback} disabled={screenTaps.length === 0 || recording}>
+                <Play size={14} />
+                回放
+              </IconButton>
+            )}
+            {numberInput(playInterval, setPlayInterval, '间隔ms')}
             <IconButton onClick={clearTaps}>清空记录</IconButton>
           </div>
           {screenTaps.length > 0 && (
             <pre class="rounded-md bg-gray-100 p-2 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {screenTaps.map((t) => `(${Math.round(t.x)}, ${Math.round(t.y)}) @ ${t.screenWidth}x${t.screenHeight}`).join('\n')}
+              {screenTaps
+                .map(
+                  (t) =>
+                    `(${Math.round(t.x)}, ${Math.round(t.y)}) @ ${t.screenWidth}x${t.screenHeight}`,
+                )
+                .join('\n')}
             </pre>
           )}
         </Section>
@@ -492,6 +592,33 @@ function App() {
             </Button>
           </div>
           <Output value={aiOut} />
+        </Section>
+      )}
+
+      {activeTab === 'jev' && (
+        <Section icon={<Scale size={16} />} title="jev 决策接口">
+          <textarea
+            value={jevInput}
+            onInput={(e) => setJevInput((e.target as HTMLTextAreaElement).value)}
+            rows={16}
+            spellcheck={false}
+            class="w-full rounded-md border border-gray-300 p-2 font-mono text-xs dark:border-gray-700 dark:bg-gray-900"
+          />
+          <div class="flex gap-2">
+            <Button onClick={doJev} disabled={jevLoading}>
+              {jevLoading ? <Loader2 size={14} class="animate-spin" /> : <Scale size={14} />}
+              {jevLoading ? '决策中...' : '决策'}
+            </Button>
+            <Button
+              onClick={() => {
+                setJevInput(json(defaultJevParams));
+                setJevOut('');
+              }}
+            >
+              重置
+            </Button>
+          </div>
+          <Output value={jevOut} />
         </Section>
       )}
     </div>

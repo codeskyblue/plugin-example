@@ -6,17 +6,18 @@ uiauto.dev 插件接口示例。基于 Preact + TypeScript + Tailwind CSS，用�
 
 页面顶部按接口分区，每个标签对应一类能力：
 
-| 标签   | 演示的 API                                                                 |
-| ------ | -------------------------------------------------------------------------- |
-| 信息   | `$u.deviceId`、`$u.plugin`                                                 |
-| Shell  | `$u.shell({ command, timeoutMs })`                                         |
-| 按键   | `$u.pressKey(key, metaState?)`                                             |
-| 输入   | `$u.inputText(text)`                                                       |
-| 点击   | `$u.tap(x, y, screenWidth, screenHeight)`                                  |
-| 画面   | `$u.screenshotAsBase64()`、`$u.setScreenImage(Blob \| null)`               |
-| 交互   | `$u.onScreenTap`、`$u.setMode`、`$u.onModeChange`                          |
-| Fetch  | `$u.fetch(url, init?)`（需在 `plugin.json` 配置 `allowed_hosts`）          |
-| AI     | `$u.openai({ messages, stream })`，支持流式与一次性返回                    |
+| 标签  | 演示的 API                                                              |
+| ----- | ----------------------------------------------------------------------- |
+| 信息  | `$u.deviceId`、`$u.plugin`                                              |
+| Shell | `$u.shell({ command, timeoutMs })`                                      |
+| 按键  | `$u.pressKey(key, metaState?)`                                          |
+| 输入  | `$u.inputText(text)`                                                    |
+| 点击  | `$u.tap(x, y, screenWidth, screenHeight)`                               |
+| 画面  | `$u.screenshotAsBase64()`、`$u.setScreenImage(Blob \| null)`            |
+| 交互  | `$u.onScreenTap`、`$u.setMode`、`$u.onModeChange`                       |
+| Fetch | `$u.fetch(url, init?)`（需在 `plugin.json` 配置 `allowed_hosts`）       |
+| AI    | `$u.openai({ messages, stream })`，支持流式与一次性返回                 |
+| Jev   | `$u.jev({ state, questions, model? })`，结构化决策（noul/choice/score） |
 
 ## 快速开始
 
@@ -71,6 +72,16 @@ const res = await $u.fetch('https://httpbin.org/get');
 
 // 调用 OpenAI 兼容接口
 const result = await $u.openai({ messages: [{ role: 'user', content: '你好' }], stream: true });
+
+// 调用 Jev 决策接口（TypeSafe System One），返回结构化 answers
+const decision = await $u.jev({
+  state: '用户请求删除一条消息',
+  questions: {
+    is_safe: { type: 'noul', instructions: '是否安全？' },
+    urgency: { type: 'choice', instructions: '紧急程度', criteria: { low: '稍后', high: '立即' } },
+    risk: { type: 'score', instructions: '风险等级', criteria: ['很低', '低', '中', '高', '很高'] },
+  },
+});
 ```
 
 ## 开发命令
